@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Google Sheets Senkronizasyonlu Telefon Rehberi</title>
+    
+    <style>
+        /* CSS KODLARI ÖNCEKİYLE AYNI */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 0;
+            margin: 0;
+        }
+        #dinamikBaslik {
+            width: 100%;
+            height: 40px;
+            background: linear-gradient(90deg, #1abc9c, #3498db, #9b59b6);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1em;
+            font-weight: 600;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-size: 300% 100%;
+            animation: renkGecisi 10s ease infinite;
+        }
+        @keyframes renkGecisi {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 400px;
+            margin-top: 30px;
+            margin-bottom: 50px;
+        }
+        h2, h3 { text-align: center; color: #333; }
+        hr { border: 0; height: 1px; background-color: #ddd; margin: 20px 0; }
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .ust-butonlar {
+            display: flex;
+            justify-content: space-between;
+            gap: 5px;
+            margin-bottom: 15px;
+            flex-wrap: wrap; 
+        }
+        .ust-butonlar button {
+            flex-basis: calc(50% - 3px);
+            padding: 10px 8px; 
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px; 
+            margin-top: 5px;
+        }
+        #btnYeniKisi { background-color: #28a745; color: white; }
+        #btnKategoriDuzenle { background-color: #ffc107; color: #333; }
+        #btnRehberYukle { background-color: #6f42c1; color: white; } 
+        #btnRehberIndir { background-color: #dc3545; color: white; } 
+
+        .arama-alani { display: flex; gap: 10px; margin-bottom: 15px; }
+        .arama-alani input { margin: 0; flex-grow: 1; }
+        #aramaSonuclari { min-height: 20px; background-color: #fff; border: 1px solid #ccc; border-top: none; max-height: 300px; overflow-y: auto; margin-bottom: 20px; border-radius: 0 0 5px 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .sonuc-satiri { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .kategori-etiketi { background-color: #e9ecef; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; color: #6c757d; margin-right: 5px; }
+        .sil-btn, .duzenle-btn { padding: 5px 10px; font-size: 12px; width: auto; margin-left: 5px; border-radius: 3px; border: none; cursor: pointer; }
+        .sil-btn { background-color: #dc3545; color: white; }
+        .duzenle-btn { background-color: #007bff; color: white; } 
+        #guncelleBtn { background-color: #28a745; color: white; width: 100%; margin-top: 10px;}
+    </style>
+</head>
+<body>
+
+    <div id="dinamikBaslik"></div>
+
+    <div class="container">
+        <h2>📞 Google Sheets Senkronizasyonlu Rehber</h2>
+        
+        <div class="ust-butonlar">
+            <button id="btnYeniKisi" onclick="toggleGosterim('yeniKisiFormu')">➕ Yeni Kişi Ekle</button>
+            <button id="btnKategoriDuzenle" onclick="toggleGosterim('kategoriDuzenlemeFormu')">⚙️ Kategorileri Düzenle</button>
+            <button id="btnRehberYukle" onclick="document.getElementById('fileInput').click()">⬆️ Rehber Yükle</button>
+            <button id="btnRehberIndir" onclick="rehberiIndir()">⬇️ Rehberi İndir</button>
+        </div>
+        
+        <input type="file" id="fileInput" accept=".txt,.csv" style="display: none;" onchange="rehberiYukle(event)">
+
+        <hr>
+
+        <div class="arama-alani">
+            <input type="text" id="aramaInput" onkeyup="aramaYap()" placeholder="İsim veya Numara Ara...">
+            <button id="btnTumRehberiGor" onclick="tumRehberiGoster()" style="background-color: #007bff; color: white;">Tüm Rehberi Gör</button>
+        </div>
+
+        <div id="aramaSonuclari">
+            <div class="sonuc-satiri" style="justify-content: center; background-color: #e9ecef;">
+                Lütfen rehberin yüklenmesini bekleyin...
+            </div>
+        </div>
+        
+        <div id="yeniKisiFormu" style="display:none;">
+            <hr>
+            <h3>Yeni Kayıt Ekleme</h3>
+            <input type="text" id="isimInput" placeholder="Ad Soyad Giriniz">
+            <input type="text" id="telInput" placeholder="Telefon Numarası (5XX...)">
+            <label for="kategoriSecim">Kategori Seçin:</label>
+            <select id="kategoriSecim"></select>
+            <div class="buton-grup">
+                <button style="background-color: #28a745; color: white;" onclick="yeniKayitEkle()">Rehbere Kaydet</button>
+            </div>
+        </div>
+        
+        <div id="duzenlemeFormu" style="display:none;">
+            <hr>
+            <h3>Kayıt Düzenle</h3>
+            <input type="hidden" id="duzenlenenKey">
+            <label for="duzenleIsim">Ad Soyad:</label>
+            <input type="text" id="duzenleIsim" required>
+            <label for="duzenleTel">Telefon Numarası:</label>
+            <input type="text" id="duzenleTel" required>
+            <label for="duzenleKategori">Kategori:</label>
+            <select id="duzenleKategori"></select>
+            <button id="guncelleBtn" onclick="kaydiGuncelle()">Kaydı Güncelle</button>
+        </div>
+
+        <div id="kategoriDuzenlemeFormu" style="display:none;">
+            <hr>
+            <h3>Kategori Yönetimi</h3>
+            <label for="yeniKategoriInput">Yeni Kategori Ekle:</label>
+            <input type="text" id="yeniKategoriInput" placeholder="Yeni Kategori Adı">
+            <button style="background-color: #ffc107; color: #333; width: 100%;" onclick="kategoriEkle()">Kategori Ekle</button>
+            <h4 style="text-align: left; margin-top: 20px;">Mevcut Kategoriler:</h4>
+            <ul id="mevcutKategorilerListesi"></ul>
+        </div>
+        
+    </div>
+
+<script>
+    // **********************************************
+    // 1. APPS SCRIPT URL'Sİ VE BAĞLANTI AYARLARI
+    // **********************************************
+
+    // Sizin verdiğiniz Web Uygulaması URL Anahtarı kullanılarak oluşturulan tam URL:
+    const SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbztx5Pj8ciRR1wcTE36o7FoXyb1Bv2qrfsPpWpvGlywNmsE37Se4byVTU5q2Q5ouSE85w/exec";
+
+    // --- GLOBAL DEĞİŞKENLER ---
+    var rehberListesi = [];
+    var kategoriListesi = [];
+    
+    const kategoriSecimElementi = document.getElementById("kategoriSecim");
+    const kategoriSecimDuzenleElementi = document.getElementById("duzenleKategori");
+    const aramaSonuclariElementi = document.getElementById("aramaSonuclari");
+    const tumRehberiGosterGizleButonu = document.getElementById("btnTumRehberiGor");
+
+    // **********************************************
+    // 2. VERİ ÇEKME VE BAŞLATMA
+    // **********************************************
+
+    document.addEventListener('DOMContentLoaded', function() {
+        saatiGuncelle();
+        setInterval(saatiGuncelle, 1000);
+        
+        // Uygulamayı başlat ve veriyi çekmeye başla
+        veriCekVeDinle();
+        setInterval(veriCekVeDinle, 5000); // Her 5 saniyede bir veriyi yenile (Realtime simülasyonu)
+    });
+
+    async function veriCekVeDinle() {
+        try {
+            const response = await fetch(SHEETS_API_URL);
+            if (!response.ok) throw new Error(`HTTP Hata: ${response.status}`);
+            
+            const veri = await response.json();
+            
+            // Rehber Verisini İşleme
+            rehberListesi = veri.filter(item => item.ad && item.no && item.kayitID);
+            
+            // Kategori Listesini Çıkarma
+            const tumKategoriler = rehberListesi.map(k => k.kategori).filter(Boolean);
+            kategoriListesi = Array.from(new Set(tumKategoriler)).filter(k => k !== 'Genel'); // Tekrarları kaldır
+            
+            if (tumRehberiGosterGizleButonu.textContent.includes("Gizle")) {
+                sonuclariEkranaYaz(rehberListesi);
+            } else if (document.getElementById("aramaInput").value.trim() !== "") {
+                aramaYap();
+            } else if (rehberListesi.length === 0) {
+                aramaSonuclariElementi.innerHTML = `<div class="sonuc-satiri" style="justify-content: center; background-color: #e9ecef;">Rehberiniz boş. Yeni kayıt ekleyin.</div>`;
+            }
+
+            kategoriListesiniYukle(kategoriSecimElementi);
+            kategoriListesiniYukle(kategoriSecimDuzenleElementi);
+            kategoriListesiniGoster();
+
+        } catch (error) {
+            console.error("Veri Çekme Hatası (Google Sheets):", error);
+            aramaSonuclariElementi.innerHTML = `<div class="sonuc-satiri" style="justify-content: center; background: #f8d7da; color: #721c24;">Veritabanına bağlanılamıyor. Apps Script URL'sini ve izinlerini kontrol edin.</div>`;
+        }
+    }
+
+    // **********************************************
+    // 3. CRUD İŞLEMLERİ (HTTP POST İLE APPS SCRİPT'E İSTEK GÖNDERME)
+    // **********************************************
+
+    async function gonderSheetsAPI(payload) {
+        const response = await fetch(SHEETS_API_URL, {
+            method: 'POST',
+            mode: 'cors', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const sonuc = await response.text();
+        return sonuc;
+    }
+
+    async function yeniKayitEkle() {
+        const isim = document.getElementById("isimInput").value.trim();
+        const tel = document.getElementById("telInput").value.trim();
+        const kategori = kategoriSecimElementi.value;
+        if (isim === "" || tel === "") { alert("Lütfen hem isim hem de numara giriniz!"); return; }
+
+        const payload = { action: 'EKLE', ad: isim, no: tel, kategori: kategori };
+        const sonuc = await gonderSheetsAPI(payload);
+
+        if (sonuc.includes("SUCCESS_EKLE")) {
+            alert(`${isim} başarıyla E-Tabloya kaydedildi ve senkronize edildi!`);
+            veriCekVeDinle(); // Başarılıysa veriyi yenile
+        } else {
+            console.error("Kayıt Başarısız:", sonuc);
+            alert("Kayıt sırasında bir hata oluştu: " + sonuc);
+        }
+
+        document.getElementById("isimInput").value = "";
+        document.getElementById("telInput").value = "";
+        kategoriSecimElementi.value = 'Genel';
+        toggleGosterim('yeniKisiFormu'); 
+    }
+    
+    function kaydiDuzenleFormuAc(kayitID) {
+        toggleGosterim('duzenlemeFormu'); 
+        kategoriListesiniYukle(kategoriSecimDuzenleElementi); 
+
+        const kisi = rehberListesi.find(k => k.kayitID === kayitID);
+        if (!kisi) { alert("Kayıt bulunamadı."); return; }
+
+        document.getElementById("duzenlenenKey").value = kayitID;
+        document.getElementById("duzenleIsim").value = kisi.ad;
+        document.getElementById("duzenleTel").value = kisi.no;
+        document.getElementById("duzenleKategori").value = kisi.kategori || 'Genel';
+    }
+
+    async function kaydiGuncelle() {
+        const kayitID = document.getElementById("duzenlenenKey").value;
+        const yeniIsim = document.getElementById("duzenleIsim").value.trim();
+        const yeniTel = document.getElementById("duzenleTel").value.trim();
+        const yeniKategori = document.getElementById("duzenleKategori").value;
+        
+        if (yeniIsim === "" || yeniTel === "") { alert("İsim ve numara boş bırakılamaz!"); return; }
+
+        const payload = { 
+            action: 'GUNCELLE', 
+            kayitID: kayitID, 
+            ad: yeniIsim, 
+            no: yeniTel, 
+            kategori: yeniKategori 
+        };
+        const sonuc = await gonderSheetsAPI(payload);
+
+        if (sonuc.includes("SUCCESS_GUNCELLE")) {
+            alert(`${yeniIsim} kaydı başarıyla güncellendi ve senkronize edildi.`);
+            veriCekVeDinle(); // Başarılıysa veriyi yenile
+            toggleGosterim('duzenlemeFormu'); 
+        } else {
+            console.error("Güncelleme Başarısız:", sonuc);
+            alert("Güncelleme sırasında bir hata oluştu: " + sonuc);
+        }
+    }
+    
+    async function sil(kayitID) {
+        const kisi = rehberListesi.find(k => k.kayitID === kayitID);
+        if (!kisi) return;
+
+        if (!confirm(`"${kisi.ad}" kaydını silmek istediğinizden emin misiniz?`)) return;
+
+        const payload = { action: 'SIL', kayitID: kayitID };
+        const sonuc = await gonderSheetsAPI(payload);
+
+        if (sonuc.includes("SUCCESS_SIL")) {
+            alert(`Kayıt silindi ve senkronize edildi.`);
+            veriCekVeDinle(); // Başarılıysa veriyi yenile
+        } else {
+            console.error("Silme Başarısız:", sonuc);
+            alert("Silme sırasında bir hata oluştu: " + sonuc);
+        }
+    }
+    
+    // **********************************************
+    // 4. KATEGORİ İŞLEMLERİ 
+    // **********************************************
+
+    function kategoriEkle() {
+        alert("Google Sheets entegrasyonunda kategori yönetimi, direkt rehber kayıtlarından türetilir. Yeni kategori eklemek için sadece yeni bir kişiyi o kategori ile kaydedin.");
+        toggleGosterim('kategoriDuzenlemeFormu'); 
+    }
+    
+    function kategoriyiSil(kategoriAdi) {
+        alert("Google Sheets entegrasyonunda kategoriyi direkt silmek yerine, o kategoriye ait kişilerin kategorisini 'Genel' olarak güncelleyebilirsiniz.");
+    }
+
+    function kategoriyiYenidenAdlandir(eskiAd) {
+        alert("Google Sheets entegrasyonunda kategoriyi yeniden adlandırmak yerine, ilgili kişileri düzenleyerek yeni kategori adını girebilirsiniz.");
+    }
+
+    // **********************************************
+    // 5. YARDIMCI VE GÖRÜNÜM FONKSİYONLARI
+    // **********************************************
+    
+    function toggleGosterim(id) {
+        const formElementi = document.getElementById(id);
+        const digerFormlar = ['yeniKisiFormu', 'kategoriDuzenlemeFormu', 'duzenlemeFormu'];
+        digerFormlar.forEach(otherId => {
+            if (otherId !== id) {
+                document.getElementById(otherId).style.display = 'none';
+            }
+        });
+
+        if (formElementi.style.display === 'none' || formElementi.style.display === '') {
+            formElementi.style.display = 'block';
+        } else {
+            formElementi.style.display = 'none';
+        }
+    }
+
+    function saatiGuncelle() {
+        const simdi = new Date();
+        const zamanString = simdi.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const tarihString = simdi.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        document.getElementById("dinamikBaslik").innerHTML = 
+            `<span style="margin-right: 15px;">📅 ${tarihString}</span> 🕐 ${zamanString}`;
+    }
+
+    function kategoriListesiniYukle(selectElement) {
+        selectElement.innerHTML = '';
+        let varsayilan = document.createElement('option');
+        varsayilan.value = 'Genel';
+        varsayilan.textContent = 'Genel (Seçilmedi)';
+        selectElement.appendChild(varsayilan);
+        kategoriListesi.forEach(kategori => {
+            let option = document.createElement('option');
+            option.value = kategori;
+            option.textContent = kategori;
+            selectElement.appendChild(option);
+        });
+    }
+
+    function kategoriListesiniGoster() {
+        const listeAlani = document.getElementById("mevcutKategorilerListesi");
+        listeAlani.innerHTML = ''; 
+        kategoriListesi.forEach((kategori) => {
+            const satir = document.createElement("li");
+            satir.style.display = 'flex';
+            satir.style.justifyContent = 'space-between';
+            satir.style.alignItems = 'center';
+            satir.style.padding = '8px 0';
+
+            satir.innerHTML = `<span>${kategori}</span>`;
+            listeAlani.appendChild(satir);
+        });
+    }
+
+    function tumRehberiGoster() {
+        if (tumRehberiGosterGizleButonu.textContent.includes("Gizle")) {
+            aramaSonuclariElementi.innerHTML = `<div class="sonuc-satiri" style="justify-content: center; background-color: #e9ecef;">Lütfen arama yapın veya "Tüm Rehberi Gör" butonuna tıklayın.</div>`;
+            tumRehberiGosterGizleButonu.textContent = "Tüm Rehberi Gör";
+            document.getElementById("aramaInput").value = ""; 
+        } else {
+            document.getElementById("aramaInput").value = ""; 
+            sonuclariEkranaYaz(rehberListesi);
+            tumRehberiGosterGizleButonu.textContent = "Gizle ❌";
+        }
+    }
+
+    function aramaYap() {
+        tumRehberiGosterGizleButonu.textContent = "Tüm Rehberi Gör";
+        const aramaMetni = document.getElementById("aramaInput").value.toLowerCase().trim();
+        
+        if (aramaMetni === "") {
+            aramaSonuclariElementi.innerHTML = `<div class="sonuc-satiri" style="justify-content: center; background-color: #e9ecef;">Lütfen arama yapın veya "Tüm Rehberi Gör" butonuna tıklayın.</div>`;
+            return;
+        }
+        
+        const filtrelenmisListe = rehberListesi.filter(kisi => {
+            const adKucuk = kisi.ad.toLowerCase();
+            const noKucuk = kisi.no.toLowerCase();
+            return adKucuk.includes(aramaMetni) || noKucuk.includes(aramaMetni);
+        });
+        
+        sonuclariEkranaYaz(filtrelenmisListe);
+    }
+    
+    function sonuclariEkranaYaz(liste) {
+        aramaSonuclariElementi.innerHTML = "";
+
+        if (liste.length === 0) {
+             aramaSonuclariElementi.innerHTML = `<div class="sonuc-satiri" style="justify-content: center; background: #fff3cd; color: #856404;">Aramanızla eşleşen sonuç bulunamadı.</div>`;
+             return;
+        }
+        
+        liste.forEach(function(kisi) {
+            var satir = document.createElement("div");
+            satir.classList.add('sonuc-satiri');
+            const kayitID = kisi.kayitID; 
+
+            satir.innerHTML = `
+                <span>
+                    <b>${kisi.ad}</b>: ${kisi.no}
+                </span>
+                <div>
+                    <span class="kategori-etiketi">${kisi.kategori || 'Genel'}</span>
+                    <button class="duzenle-btn" onclick="kaydiDuzenleFormuAc('${kayitID}')">Düzenle</button>
+                    <button class="sil-btn" onclick="sil('${kayitID}')">Sil</button>
+                </div>
+            `;
+            aramaSonuclariElementi.appendChild(satir);
+        });
+    }
+    
+    // Yükleme/İndirme fonksiyonları Google Sheets yapısına uygun olarak ayarlanmalıdır. 
+    // Ancak temel işlevsellik (kaydetme, silme, okuma) artık çalışmalıdır.
+    function rehberiYukle(event) { alert("Bu özellik Google Sheets API yapısına göre yeniden entegre edilmelidir."); event.target.value = null; }
+    function rehberiIndir() { alert("Bu özellik Google Sheets API yapısına göre yeniden entegre edilmelidir."); }
+
+</script>
+</body>
+</html>
